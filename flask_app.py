@@ -13,50 +13,52 @@ def dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>API Monitor - Agify</title>
+        <title>Dashboard Agify</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; margin: 0; padding: 40px; color: #1a1a1a; }
-            .container { max-width: 900px; margin: auto; }
-            .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-            h1 { margin: 0; font-size: 24px; color: #111827; }
-            .refresh-btn { background-color: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
-            .refresh-btn:hover { background-color: #4338ca; }
-            .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden; }
+            body { font-family: 'Inter', sans-serif; background-color: #f8fafc; margin: 0; padding: 40px; color: #1e293b; }
+            .container { max-width: 800px; margin: auto; }
+            .api-badge { background-color: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 6px; font-size: 14px; font-weight: 600; display: inline-block; margin-bottom: 10px; }
+            h1 { margin: 0 0 30px 0; font-size: 28px; color: #0f172a; }
+            .card { background: white; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e2e8f0; }
             table { width: 100%; border-collapse: collapse; text-align: left; }
-            th { background-color: #f9fafb; padding: 15px; font-size: 12px; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #edf2f7; }
-            td { padding: 15px; border-bottom: 1px solid #edf2f7; font-size: 14px; }
-            .status { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-            .status-ok { background-color: #dcfce7; color: #166534; }
-            .status-err { background-color: #fee2e2; color: #991b1b; }
-            .latency { color: #6b7280; font-family: monospace; }
+            th { background-color: #f1f5f9; padding: 16px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+            td { padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+            .status { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+            .status-ok { background-color: #dcfce7; color: #15803d; }
+            .status-err { background-color: #fee2e2; color: #b91c1c; }
+            .latency { font-weight: 600; color: #475569; }
+            .refresh-area { text-align: right; margin-bottom: 15px; }
+            .btn { background-color: #0f172a; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: opacity 0.2s; }
+            .btn:hover { opacity: 0.8; }
         </style>
     </head>
     <body>
         <div class="container">
-            <div class="header">
-                <h1>🚀 API Monitor : Agify</h1>
-                <button class="refresh-btn" onclick="location.reload()">Actualiser</button>
+            <span class="api-badge">Projet Atelier M1</span>
+            <h1>Suivi de l'API : Agify</h1>
+            
+            <div class="refresh-area">
+                <button class="btn" onclick="location.reload()">Actualiser</button>
             </div>
+
             <div class="card">
                 <table>
                     <thead>
                         <tr>
-                            <th>Date & Heure</th>
-                            <th>API</th>
+                            <th>Horodatage</th>
                             <th>Latence</th>
-                            <th>Statut</th>
+                            <th>Etat du service</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for run in runs %}
                         <tr>
                             <td>{{ run[1] }}</td>
-                            <td><strong>{{ run[2] }}</strong></td>
                             <td class="latency">{{ run[3] }} ms</td>
                             <td>
                                 <span class="status {{ 'status-ok' if run[4] == 1 else 'status-err' }}">
-                                    {{ "OPÉRATIONNEL" if run[4] == 1 else "ÉCHEC" }}
+                                    {{ "Operationnel" if run[4] == 1 else "Erreur" }}
                                 </span>
                             </td>
                         </tr>
