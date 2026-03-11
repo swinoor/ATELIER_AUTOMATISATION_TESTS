@@ -23,7 +23,6 @@ def dashboard():
     total_tests = len(runs)
     avg_latency = round(sum(r[3] for r in runs) / total_tests, 1) if total_tests > 0 else 0
     
-    # Calcul du taux de succès (toujours basé sur < 500ms pour tes stats internes)
     success_count = sum(1 for r in runs if r[4] == 1 and r[3] < 500)
     success_rate = round((success_count / total_tests) * 100, 1) if total_tests > 0 else 0
 
@@ -54,7 +53,7 @@ def dashboard():
                 background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 20px; margin-bottom: 20px;
                 overflow-x: auto;
             }
-            .chart-area { min-width: 1200px; height: 300px; }
+            .chart-area { min-width: 1200px; height: 320px; padding: 10px; }
 
             .card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; overflow: hidden; }
             .actions { display: flex; gap: 10px; }
@@ -66,8 +65,9 @@ def dashboard():
             table { width: 100%; border-collapse: collapse; }
             th { text-align: left; font-size: 11px; color: #94a3b8; text-transform: uppercase; padding: 15px; background: #1e293b; }
             td { padding: 15px; border-top: 1px solid #334155; font-size: 14px; }
-            .latency-good { color: #4ade80; font-weight: 600; }
-            .latency-bad { color: #f87171; font-weight: 600; }
+            
+            .badge-ok { background: #064e3b; color: #4ade80; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid #065f46; }
+            .badge-slow { background: #451a1a; color: #f87171; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; border: 1px solid #7f1d1d; }
 
             ::-webkit-scrollbar { height: 8px; }
             ::-webkit-scrollbar-track { background: #0f172a; }
@@ -87,7 +87,7 @@ def dashboard():
 
             <div class="stats-grid">
                 <div class="stat-card"><div class="stat-label">Latence Moyenne</div><div class="stat-value">{{ avg_latency }} ms</div></div>
-                <div class="stat-card"><div class="stat-label">Tests < 500ms</div><div class="stat-value">{{ success_rate }}%</div></div>
+                <div class="stat-card"><div class="stat-label">Qualité (< 500ms)</div><div class="stat-value">{{ success_rate }}%</div></div>
                 <div class="stat-card"><div class="stat-label">Total Tests</div><div class="stat-value">{{ total_tests }}</div></div>
             </div>
             
@@ -100,15 +100,25 @@ def dashboard():
             <div class="card">
                 <table>
                     <thead>
-                        <tr><th style="padding-left:20px">ID</th><th>Date</th><th>Latence Mesurée</th></tr>
+                        <tr>
+                            <th style="padding-left:20px">ID</th>
+                            <th>Date</th>
+                            <th>Latence</th>
+                            <th>Status</th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for run in runs %}
                         <tr>
                             <td style="padding-left:20px">#{{ run[0] }}</td>
                             <td>{{ run[1] }}</td>
-                            <td class="{{ 'latency-good' if run[3] < 500 else 'latency-bad' }}">
-                                {{ run[3] }} ms
+                            <td style="font-weight: 600;">{{ run[3] }} ms</td>
+                            <td>
+                                {% if run[3] < 500 %}
+                                    <span class="badge-ok">STATUS OK!</span>
+                                {% else %}
+                                    <span class="badge-slow">LENT</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -141,7 +151,7 @@ def dashboard():
                         data: {{ data_points|tojson }},
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                        fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2,
+                        fill: true, tension: 0.3, pointRadius: 5, borderWidth: 3,
                         segment: {
                             borderColor: ctx => ctx.p0.parsed.y > 500 || ctx.p1.parsed.y > 500 ? '#ef4444' : '#6366f1'
                         }
@@ -150,9 +160,19 @@ def dashboard():
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => ctx.raw + ' ms' } }
+                    },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#334155' }, 
+                            ticks: { 
+                                color: '#94a3b8',
+                                callback: function(value) { return value + ' ms'; } // Ajout du "ms" sur l'axe
+                            }
+                        },
                         x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
                     }
                 }
