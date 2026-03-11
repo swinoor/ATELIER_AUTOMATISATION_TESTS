@@ -8,7 +8,6 @@ app = Flask(__name__)
 @app.route('/run-test', methods=['POST'])
 def run_test():
     try:
-        # Lance le script de test manuellement
         subprocess.run(["python3", "tester.py"], check=True)
         return jsonify({"status": "success"})
     except Exception as e:
@@ -17,14 +16,23 @@ def run_test():
 @app.get("/")
 def dashboard():
     runs = storage.get_recent_runs()
+    
+    # On prépare les données pour le graphique (ordre chronologique)
     chart_runs = runs[::-1]
-    labels = [r[1].split()[1] for r in chart_runs]
+    
+    # ICI : On récupère les ID des tests pour l'axe du bas
+    labels = [f"Test {r[0]}" for r in chart_runs] 
     data_points = [r[3] for r in chart_runs]
     
-    # Préparation des données pour l'export JSON
     json_data = []
     for r in runs:
-        json_data.append({"id": r[0], "date": r[1], "api": r[2], "latency": r[3], "success": bool(r[4])})
+        json_data.append({
+            "id": r[0], 
+            "date": r[1], 
+            "api": r[2], 
+            "latency": r[3], 
+            "success": bool(r[4])
+        })
 
     html_code = """
     <!DOCTYPE html>
@@ -40,9 +48,9 @@ def dashboard():
             .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
             h1 { font-size: 24px; color: #0f172a; margin: 0; }
             .actions { display: flex; gap: 10px; }
-            .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
+            .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
             table { width: 100%; border-collapse: collapse; }
-            th { text-align: left; font-size: 12px; color: #64748b; text-transform: uppercase; padding: 12px; }
+            th { text-align: left; font-size: 12px; color: #64748b; text-transform: uppercase; padding: 12px; border-bottom: 1px solid #f1f5f9; }
             td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
             .btn { border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
             .btn-primary { background: #4f46e5; color: white; }
@@ -58,7 +66,7 @@ def dashboard():
                 <h1>Monitoring Agify</h1>
                 <div class="actions">
                     <button class="btn btn-secondary" onclick="exportJSON()">Exporter JSON</button>
-                    <button class="btn btn-primary" onclick="triggerTest()">Lancer un test</button>
+                    <button class="btn btn-primary" id="testBtn" onclick="triggerTest()">Lancer un test</button>
                 </div>
             </div>
             
@@ -66,16 +74,22 @@ def dashboard():
                 <canvas id="latencyChart" height="100"></canvas>
             </div>
 
-            <div class="card">
+            <div class="card" style="padding: 0;">
                 <table>
                     <thead>
-                        <tr><th>Heure</th><th>Latence</th><th>Statut</th></tr>
+                        <tr>
+                            <th style="padding-left: 20px;">ID</th>
+                            <th>Date / Heure</th>
+                            <th>Latence</th>
+                            <th>Statut</th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for run in runs %}
                         <tr>
+                            <td style="padding-left: 20px; color: #64748b;">#{{ run[0] }}</td>
                             <td>{{ run[1] }}</td>
-                            <td>{{ run[3] }} ms</td>
+                            <td style="font-weight: 600;">{{ run[3] }} ms</td>
                             <td class="{{ 'status-ok' if run[4] == 1 else 'status-err' }}">
                                 {{ "Operationnel" if run[4] == 1 else "Erreur" }}
                             </td>
@@ -88,12 +102,19 @@ def dashboard():
 
         <script>
             function triggerTest() {
-                const btn = document.querySelector('.btn-primary');
+                const btn = document.getElementById('testBtn');
                 btn.innerText = "En cours...";
                 btn.disabled = true;
                 fetch('/run-test', { method: 'POST' })
-                    .then(() => location.reload())
-                    .catch(() => { alert('Erreur'); btn.disabled = false; btn.innerText = "Lancer un test"; });
+                    .then(response => {
+                        if(response.ok) location.reload();
+                        else alert('Erreur lors du test');
+                    })
+                    .catch(() => {
+                        alert('Erreur réseau');
+                        btn.disabled = false;
+                        btn.innerText = "Lancer un test";
+                    });
             }
 
             function exportJSON() {
@@ -116,9 +137,25 @@ def dashboard():
                         data: {{ data_points|tojson }},
                         borderColor: '#4f46e5',
                         backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderWidth: 2,
                         fill: true,
-                        tension: 0.4
+                        tension: 0.3,
+                        pointBackgroundColor: '#4f46e5'
                     }]
+                },
+                options: {
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            title: { display: true, text: 'Latence (ms)' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Numero du test' }
+                        }
+                    }
                 }
             });
         </script>
