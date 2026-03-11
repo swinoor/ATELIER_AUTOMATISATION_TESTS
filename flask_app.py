@@ -5,7 +5,7 @@ from urllib.request import urlopen
 from werkzeug.utils import secure_filename
 import sqlite3
 
-app = Flask(name)
+app = Flask(__name___)
 
 @app.get("/")
 def consignes():
