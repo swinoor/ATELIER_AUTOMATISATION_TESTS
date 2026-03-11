@@ -1,18 +1,31 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, jsonify
 import storage
+import subprocess
 import json
 
 app = Flask(__name__)
 
+@app.route('/run-test', methods=['POST'])
+def run_test():
+    try:
+        # Lance le script de test manuellement
+        subprocess.run(["python3", "tester.py"], check=True)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.get("/")
 def dashboard():
     runs = storage.get_recent_runs()
-    
-    # On inverse l'ordre pour que le graphique aille de gauche à droite (du plus vieux au plus récent)
     chart_runs = runs[::-1]
-    labels = [r[1].split()[1] for r in chart_runs] # On ne garde que l'heure
-    data_points = [r[3] for r in chart_runs] # La latence
+    labels = [r[1].split()[1] for r in chart_runs]
+    data_points = [r[3] for r in chart_runs]
     
+    # Préparation des données pour l'export JSON
+    json_data = []
+    for r in runs:
+        json_data.append({"id": r[0], "date": r[1], "api": r[2], "latency": r[3], "success": bool(r[4])})
+
     html_code = """
     <!DOCTYPE html>
     <html lang="fr">
@@ -24,20 +37,30 @@ def dashboard():
         <style>
             body { font-family: 'Inter', sans-serif; background-color: #f8fafc; margin: 0; padding: 40px; }
             .container { max-width: 900px; margin: auto; }
-            h1 { font-size: 24px; color: #0f172a; margin-bottom: 20px; }
-            .card { background: white; border-radius: 12px; shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th { text-align: left; font-size: 12px; color: #64748b; text-transform: uppercase; padding: 12px; border-bottom: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+            h1 { font-size: 24px; color: #0f172a; margin: 0; }
+            .actions { display: flex; gap: 10px; }
+            .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th { text-align: left; font-size: 12px; color: #64748b; text-transform: uppercase; padding: 12px; }
             td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+            .btn { border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
+            .btn-primary { background: #4f46e5; color: white; }
+            .btn-secondary { background: #e2e8f0; color: #475569; }
+            .btn:hover { opacity: 0.8; }
             .status-ok { color: #15803d; font-weight: 600; }
             .status-err { color: #b91c1c; font-weight: 600; }
-            .btn { background: #0f172a; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; float: right; }
         </style>
     </head>
     <body>
         <div class="container">
-            <button class="btn" onclick="location.reload()">Actualiser</button>
-            <h1>Monitoring Agify</h1>
+            <div class="header">
+                <h1>Monitoring Agify</h1>
+                <div class="actions">
+                    <button class="btn btn-secondary" onclick="exportJSON()">Exporter JSON</button>
+                    <button class="btn btn-primary" onclick="triggerTest()">Lancer un test</button>
+                </div>
+            </div>
             
             <div class="card">
                 <canvas id="latencyChart" height="100"></canvas>
@@ -46,11 +69,7 @@ def dashboard():
             <div class="card">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Heure</th>
-                            <th>Latence</th>
-                            <th>Statut</th>
-                        </tr>
+                        <tr><th>Heure</th><th>Latence</th><th>Statut</th></tr>
                     </thead>
                     <tbody>
                         {% for run in runs %}
@@ -68,6 +87,25 @@ def dashboard():
         </div>
 
         <script>
+            function triggerTest() {
+                const btn = document.querySelector('.btn-primary');
+                btn.innerText = "En cours...";
+                btn.disabled = true;
+                fetch('/run-test', { method: 'POST' })
+                    .then(() => location.reload())
+                    .catch(() => { alert('Erreur'); btn.disabled = false; btn.innerText = "Lancer un test"; });
+            }
+
+            function exportJSON() {
+                const data = {{ json_data|tojson }};
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'api_stats.json';
+                a.click();
+            }
+
             const ctx = document.getElementById('latencyChart').getContext('2d');
             new Chart(ctx, {
                 type: 'line',
@@ -81,17 +119,13 @@ def dashboard():
                         fill: true,
                         tension: 0.4
                     }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
                 }
             });
         </script>
     </body>
     </html>
     """
-    return render_template_string(html_code, runs=runs, labels=labels, data_points=data_points)
+    return render_template_string(html_code, runs=runs, labels=labels, data_points=data_points, json_data=json_data)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
