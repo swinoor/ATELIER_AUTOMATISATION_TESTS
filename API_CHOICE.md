@@ -1,7 +1,7 @@
 # API Choice
 
-- Étudiant :
-- API choisie :
+- Étudiant :Milan
+- API choisie :agyfi
 - URL base :
 - Documentation officielle / README :
 - Auth : None / API Key / OAuth
