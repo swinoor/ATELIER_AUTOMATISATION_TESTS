@@ -2,8 +2,8 @@
 
 - Étudiant :Milan
 - API choisie :agyfi
-- URL base :
-- Documentation officielle / README :
+- URL base :https://agify.io
+- Documentation officielle / README :https://agify.io/documentation
 - Auth : None / API Key / OAuth
 - Endpoints testés :
   - GET ...
