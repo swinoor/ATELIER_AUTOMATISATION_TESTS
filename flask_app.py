@@ -11,7 +11,15 @@ def run_test():
         subprocess.run(["python3", "tester.py"], check=True)
         return jsonify({"status": "success"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error"}), 500
+
+@app.route('/reset', methods=['POST'])
+def reset_data():
+    try:
+        storage.reset_db()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error"}), 500
 
 @app.get("/")
 def dashboard():
@@ -48,11 +56,8 @@ def dashboard():
             .stat-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
             .stat-value { font-size: 20px; font-weight: 700; color: #f8fafc; }
 
-            .chart-container-wrapper { 
-                background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 20px; margin-bottom: 20px;
-                overflow-x: auto; /* Active la barre de défilement en bas */
-            }
-            .chart-area { min-width: 1200px; height: 300px; } /* Force une largeur plus grande pour faire apparaître le scroll */
+            .chart-container-wrapper { background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 20px; margin-bottom: 20px; overflow-x: auto; }
+            .chart-area { min-width: 1000px; height: 300px; }
 
             .card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; overflow: hidden; }
             .actions { display: flex; gap: 10px; }
@@ -60,16 +65,15 @@ def dashboard():
             .btn-primary { background: #6366f1; color: white; }
             .btn-secondary { background: #334155; color: #f8fafc; }
             .btn-refresh { background: #10b981; color: white; }
+            .btn-danger { background: #ef4444; color: white; }
             
             table { width: 100%; border-collapse: collapse; }
-            th { text-align: left; font-size: 11px; color: #94a3b8; text-transform: uppercase; padding: 15px; background: #1e293b; }
+            th { text-align: left; font-size: 11px; color: #94a3b8; text-transform: uppercase; padding: 15px; }
             td { padding: 15px; border-top: 1px solid #334155; font-size: 14px; }
             .status-ok { color: #4ade80; font-weight: 600; }
             .status-err { color: #f87171; font-weight: 600; }
 
-            /* Style de la barre de défilement */
             ::-webkit-scrollbar { height: 8px; }
-            ::-webkit-scrollbar-track { background: #0f172a; }
             ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
         </style>
     </head>
@@ -78,6 +82,7 @@ def dashboard():
             <div class="header">
                 <h1>Analyse Agify</h1>
                 <div class="actions">
+                    <button class="btn btn-danger" onclick="resetData()">Reset</button>
                     <button class="btn btn-refresh" onclick="location.reload()">Actualiser</button>
                     <button class="btn btn-secondary" onclick="exportJSON()">Exporter JSON</button>
                     <button class="btn btn-primary" id="testBtn" onclick="triggerTest()">Lancer un test</button>
@@ -97,9 +102,7 @@ def dashboard():
             </div>
             
             <div class="chart-container-wrapper">
-                <div class="chart-area">
-                    <canvas id="latencyChart"></canvas>
-                </div>
+                <div class="chart-area"><canvas id="latencyChart"></canvas></div>
             </div>
 
             <div class="card">
@@ -130,11 +133,17 @@ def dashboard():
                 fetch('/run-test', { method: 'POST' }).then(() => location.reload());
             }
 
+            function resetData() {
+                if(confirm("Voulez-vous vraiment supprimer tout l'historique ?")) {
+                    fetch('/reset', { method: 'POST' }).then(() => location.reload());
+                }
+            }
+
             function exportJSON() {
                 const data = {{ json_data|tojson }};
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = 'api_stats.json'; a.click();
+                const a = document.createElement('a'); a.href = url; a.download = 'export.json'; a.click();
             }
 
             const ctx = document.getElementById('latencyChart').getContext('2d');
@@ -147,7 +156,7 @@ def dashboard():
                         data: {{ data_points|tojson }},
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                        fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2
+                        fill: true, tension: 0.3, pointRadius: 4
                     }]
                 },
                 options: {
@@ -160,7 +169,6 @@ def dashboard():
                     }
                 }
             });
-            // Pour scroller tout à fait à droite automatiquement au chargement
             const wrapper = document.querySelector('.chart-container-wrapper');
             wrapper.scrollLeft = wrapper.scrollWidth;
         </script>
@@ -173,3 +181,4 @@ def dashboard():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+    
