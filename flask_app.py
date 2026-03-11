@@ -23,12 +23,9 @@ def dashboard():
     total_tests = len(runs)
     avg_latency = round(sum(r[3] for r in runs) / total_tests, 1) if total_tests > 0 else 0
     
-    # On recalcule le taux de succès avec la nouvelle règle des 500ms
+    # Calcul du taux de succès (toujours basé sur < 500ms pour tes stats internes)
     success_count = sum(1 for r in runs if r[4] == 1 and r[3] < 500)
     success_rate = round((success_count / total_tests) * 100, 1) if total_tests > 0 else 0
-    
-    # État global basé sur le dernier test (< 500ms et succès)
-    last_status = 1 if (total_tests > 0 and runs[0][4] == 1 and runs[0][3] < 500) else 0
 
     json_data = []
     for r in runs:
@@ -48,7 +45,7 @@ def dashboard():
             .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
             h1 { font-size: 26px; margin: 0; font-weight: 700; }
             
-            .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+            .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
             .stat-card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; }
             .stat-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
             .stat-value { font-size: 20px; font-weight: 700; color: #f8fafc; }
@@ -69,8 +66,8 @@ def dashboard():
             table { width: 100%; border-collapse: collapse; }
             th { text-align: left; font-size: 11px; color: #94a3b8; text-transform: uppercase; padding: 15px; background: #1e293b; }
             td { padding: 15px; border-top: 1px solid #334155; font-size: 14px; }
-            .status-ok { color: #4ade80; font-weight: 600; }
-            .status-err { color: #f87171; font-weight: 600; }
+            .latency-good { color: #4ade80; font-weight: 600; }
+            .latency-bad { color: #f87171; font-weight: 600; }
 
             ::-webkit-scrollbar { height: 8px; }
             ::-webkit-scrollbar-track { background: #0f172a; }
@@ -89,14 +86,8 @@ def dashboard():
             </div>
 
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Etat Global (< 500ms)</div>
-                    <div class="stat-value" style="color: {{ '#4ade80' if last_status == 1 else '#f87171' }}">
-                        {{ "OK" if last_status == 1 else "LENT/ERR" }}
-                    </div>
-                </div>
                 <div class="stat-card"><div class="stat-label">Latence Moyenne</div><div class="stat-value">{{ avg_latency }} ms</div></div>
-                <div class="stat-card"><div class="stat-label">Taux de Succès</div><div class="stat-value">{{ success_rate }}%</div></div>
+                <div class="stat-card"><div class="stat-label">Tests < 500ms</div><div class="stat-value">{{ success_rate }}%</div></div>
                 <div class="stat-card"><div class="stat-label">Total Tests</div><div class="stat-value">{{ total_tests }}</div></div>
             </div>
             
@@ -109,18 +100,15 @@ def dashboard():
             <div class="card">
                 <table>
                     <thead>
-                        <tr><th style="padding-left:20px">ID</th><th>Date</th><th>Latence</th><th>Statut</th></tr>
+                        <tr><th style="padding-left:20px">ID</th><th>Date</th><th>Latence Mesurée</th></tr>
                     </thead>
                     <tbody>
                         {% for run in runs %}
                         <tr>
                             <td style="padding-left:20px">#{{ run[0] }}</td>
                             <td>{{ run[1] }}</td>
-                            <td style="font-weight: 600; color: {{ '#4ade80' if run[3] < 500 else '#fca5a5' }};">
+                            <td class="{{ 'latency-good' if run[3] < 500 else 'latency-bad' }}">
                                 {{ run[3] }} ms
-                            </td>
-                            <td class="{{ 'status-ok' if (run[4] == 1 and run[3] < 500) else 'status-err' }}">
-                                {{ "Opérationnel" if (run[4] == 1 and run[3] < 500) else "Lent ou Échec" }}
                             </td>
                         </tr>
                         {% endfor %}
@@ -164,13 +152,7 @@ def dashboard():
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            grid: { color: '#334155' }, 
-                            ticks: { color: '#94a3b8' },
-                            // On ajoute une ligne visuelle à 500ms
-                            suggestedMax: 600
-                        },
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
                         x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
                     }
                 }
@@ -183,7 +165,7 @@ def dashboard():
     """
     return render_template_string(html_code, runs=runs, labels=labels, data_points=data_points, 
                                  json_data=json_data, avg_latency=avg_latency, 
-                                 success_rate=success_rate, total_tests=total_tests, last_status=last_status)
+                                 success_rate=success_rate, total_tests=total_tests)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
