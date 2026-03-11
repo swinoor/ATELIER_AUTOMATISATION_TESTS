@@ -22,8 +22,13 @@ def dashboard():
     
     total_tests = len(runs)
     avg_latency = round(sum(r[3] for r in runs) / total_tests, 1) if total_tests > 0 else 0
-    success_rate = round((sum(1 for r in runs if r[4] == 1) / total_tests) * 100, 1) if total_tests > 0 else 0
-    last_status = runs[0][4] if total_tests > 0 else 1
+    
+    # On recalcule le taux de succès avec la nouvelle règle des 500ms
+    success_count = sum(1 for r in runs if r[4] == 1 and r[3] < 500)
+    success_rate = round((success_count / total_tests) * 100, 1) if total_tests > 0 else 0
+    
+    # État global basé sur le dernier test (< 500ms et succès)
+    last_status = 1 if (total_tests > 0 and runs[0][4] == 1 and runs[0][3] < 500) else 0
 
     json_data = []
     for r in runs:
@@ -50,9 +55,9 @@ def dashboard():
 
             .chart-container-wrapper { 
                 background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 20px; margin-bottom: 20px;
-                overflow-x: auto; /* Active la barre de défilement en bas */
+                overflow-x: auto;
             }
-            .chart-area { min-width: 1200px; height: 300px; } /* Force une largeur plus grande pour faire apparaître le scroll */
+            .chart-area { min-width: 1200px; height: 300px; }
 
             .card { background: #1e293b; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; overflow: hidden; }
             .actions { display: flex; gap: 10px; }
@@ -67,7 +72,6 @@ def dashboard():
             .status-ok { color: #4ade80; font-weight: 600; }
             .status-err { color: #f87171; font-weight: 600; }
 
-            /* Style de la barre de défilement */
             ::-webkit-scrollbar { height: 8px; }
             ::-webkit-scrollbar-track { background: #0f172a; }
             ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
@@ -86,13 +90,13 @@ def dashboard():
 
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-label">Etat Global</div>
+                    <div class="stat-label">Etat Global (< 500ms)</div>
                     <div class="stat-value" style="color: {{ '#4ade80' if last_status == 1 else '#f87171' }}">
-                        {{ "OK" if last_status == 1 else "ERREUR" }}
+                        {{ "OK" if last_status == 1 else "LENT/ERR" }}
                     </div>
                 </div>
                 <div class="stat-card"><div class="stat-label">Latence Moyenne</div><div class="stat-value">{{ avg_latency }} ms</div></div>
-                <div class="stat-card"><div class="stat-label">Taux de Succes</div><div class="stat-value">{{ success_rate }}%</div></div>
+                <div class="stat-card"><div class="stat-label">Taux de Succès</div><div class="stat-value">{{ success_rate }}%</div></div>
                 <div class="stat-card"><div class="stat-label">Total Tests</div><div class="stat-value">{{ total_tests }}</div></div>
             </div>
             
@@ -112,9 +116,11 @@ def dashboard():
                         <tr>
                             <td style="padding-left:20px">#{{ run[0] }}</td>
                             <td>{{ run[1] }}</td>
-                            <td style="font-weight: 600;">{{ run[3] }} ms</td>
-                            <td class="{{ 'status-ok' if run[4] == 1 else 'status-err' }}">
-                                {{ "Operationnel" if run[4] == 1 else "Echec" }}
+                            <td style="font-weight: 600; color: {{ '#4ade80' if run[3] < 500 else '#fca5a5' }};">
+                                {{ run[3] }} ms
+                            </td>
+                            <td class="{{ 'status-ok' if (run[4] == 1 and run[3] < 500) else 'status-err' }}">
+                                {{ "Opérationnel" if (run[4] == 1 and run[3] < 500) else "Lent ou Échec" }}
                             </td>
                         </tr>
                         {% endfor %}
@@ -147,7 +153,10 @@ def dashboard():
                         data: {{ data_points|tojson }},
                         borderColor: '#6366f1',
                         backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                        fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2
+                        fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2,
+                        segment: {
+                            borderColor: ctx => ctx.p0.parsed.y > 500 || ctx.p1.parsed.y > 500 ? '#ef4444' : '#6366f1'
+                        }
                     }]
                 },
                 options: {
@@ -155,12 +164,17 @@ def dashboard():
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#334155' }, 
+                            ticks: { color: '#94a3b8' },
+                            // On ajoute une ligne visuelle à 500ms
+                            suggestedMax: 600
+                        },
                         x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
                     }
                 }
             });
-            // Pour scroller tout à fait à droite automatiquement au chargement
             const wrapper = document.querySelector('.chart-container-wrapper');
             wrapper.scrollLeft = wrapper.scrollWidth;
         </script>
